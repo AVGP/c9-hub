@@ -45,10 +45,6 @@ var port = process.env.PORT || 3105;
 app.set('port', port);
 app.set('view engine', 'html');
 app.set('views', __dirname + '/views');
-<<<<<<< HEAD
-=======
-app.set('view engine', 'jade');
->>>>>>> avgp/master
 app.set('baseUrl', config.BASE_URL);
 app.set('runningWorkspaces', {});
 
