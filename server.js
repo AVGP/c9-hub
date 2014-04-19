@@ -8,7 +8,6 @@ var express = require('express')
   , fs = require('fs')
   , path = require('path')
   , http = require('http')
-  , path = require('path')
   , passport = require('passport')
   , GithubStrategy = require('passport-github').Strategy;
 try {
