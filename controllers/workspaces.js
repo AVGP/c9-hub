@@ -4,6 +4,8 @@ var fs = require('fs'),
   _ = require('lodash'),
   spawn = require('child_process').spawn;
 
+
+
 var respondInvalidWorkspace = function(res) {
   res.status(400);
   res.json({msg: "Invalid workspace name"});
@@ -53,20 +55,26 @@ exports.create = function(req, res) {
  * GET workspaces listing.
  */
 exports.list = function(req, res){
-  fs.readdir(__dirname + '/../workspaces/' + req.user, function(err, files) {
-    if(err) {
-      res.status(500);
-      res.json({error: err});
-    } else {
-      var workspaces = [];
-      for(var i=0; i< files.length; i++) {
-          // Skip hidden files
-          if(files[i][0] === '.') continue;
 
-          workspaces.push({name: files[i]})
+  console.log("User : " + req.user);
+  fs.readdir(__dirname + '/../workspaces/' + req.user, function(err, files) {
+    //console.log("Error in listing workspaces. Workspace Directory : " + __dirname + '/../workspaces/');
+
+      var workspaces = [];
+
+      if (files != null || files != undefined) {
+          for (var i = 0; i < files.length; i++) {
+              // Skip hidden files
+              if (files[i][0] === '.') continue;
+
+              workspaces.push({name: files[i]})
+          }
+      }
+      else {
+             workspaces.push({name: files[0]})
       }
       res.json({workspaces: workspaces});
-    }
+
   });
 };
 
@@ -146,7 +154,7 @@ exports.destroy = function(req, res) {
 
    if(typeof req.app.get('runningWorkspaces')[req.user + '/' + workspaceName] === 'undefined'){
        getNextAvailablePort(function(nextFreePort){
-            console.log("Starting " + __dirname + '/../../c9/bin/cloud9.sh for workspace ' + workspaceName + " on port " + nextFreePort);
+            console.log("Starting " + __dirname + ' together /../../c9/server.js for workspace ' + workspaceName + " on port " + nextFreePort);
        
             var workspace = spawn(__dirname + '/../../c9/bin/cloud9.sh', ['-w', __dirname + '/../workspaces/' + req.user + '/' + workspaceName, '-l', '0.0.0.0', '-p', nextFreePort], {detached: true});
             workspace.stderr.on('data', function (data) {
