@@ -9,22 +9,25 @@ var WorkspaceCtrl = function($scope, $http, $timeout, $sce) {
   .error(function(err) { alert(err.msg) });
 
   var _sendKeepAlive = function() {
-    $http.post('/workspace/' + $scope.currentWorkspace.name + '/keepalive').success(function() {
+    $http.post('/workspace/' + $scope.currentWorkspace.name).success(function() {
       $timeout(_sendKeepAlive, 300000);
     });
   };
-  
+
   $scope.startEditing = function() {
+    alert("Editing the workspace");
+    alert($scope.currentWorkspace.url)
     $scope.currentWorkspace.editing = true;
     $scope.iframeSrc = $sce.trustAsResourceUrl($scope.currentWorkspace.url);
   };
 
   var createWorkspace = function() {
+    alert("Creating Workspace");
     var wsName = $scope.currentWorkspace.name;
     $scope.loadingWorkspace = true;
     $http.post('/workspace/', {name: wsName})
     .success(function(data) {
-      // alert(data.msg);
+            alert(data.msg);
       $scope.loadingWorkspace = false;
       $scope.workspaces.push({name: wsName});
       $scope.currentWorkspace = false;
@@ -32,6 +35,8 @@ var WorkspaceCtrl = function($scope, $http, $timeout, $sce) {
     .error(function(err) {
       alert("Error: " + err.msg);
     });
+
+
   } 
   
   $scope.saveWorkspace = function(){
@@ -74,13 +79,13 @@ var WorkspaceCtrl = function($scope, $http, $timeout, $sce) {
   }
   
   $scope.runWorkspace = function(name) {
+    alert("Inside Run workspace");
     $scope.iframeSrc = '';
     $scope.loadingWorkspace = true;
     $http.get('/workspace/' + name).success(function(data) {
-        console.log('data', data);
         $scope.currentWorkspace = {};
         $scope.currentWorkspace.name = name;
-        $scope.currentWorkspace.url = data.url;
+        $scope.currentWorkspace.url = "http://0.0.0.0:3131";      //data.url;
         $scope.currentWorkspace.user = data.user;
         $scope.currentWorkspace.editing = false;
         _sendKeepAlive();
