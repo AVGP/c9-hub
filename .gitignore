@@ -6,4 +6,3 @@ config.js
 .bower-*/
 public/lib
 .settings
-public/css/*

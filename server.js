@@ -3,6 +3,9 @@
  */
 
 var express = require('express')
+  , http = require('http')
+  , mongoose = require('mongoose')
+  , mongoStore = require('connect-mongo')(express)
   , routes = require('./routes')
   , workspace = require('./routes/workspace')
   , index = require('./routes/index')
@@ -15,9 +18,29 @@ var express = require('express')
   , flash = require('connect-flash')
   , helpers = require('view-helpers')
   , consolidate = require('consolidate')
-  , GithubStrategy = require('passport-github').Strategy;
+  , GithubStrategy = require('passport-github').Strategy
+  , LocalStrategy = require('passport-local').Strategy;
+
+// load up the user model
+var User       = require('./models/user');
+
+// requires
+var express = require('express');
+app = express();
+
+var morgan = require('morgan');
+var cookieParser = require('cookie-parser');
+var bodyParser = require('body-parser');
+var session = require('express-session');
+
+var configDB = require('./config/database.js');
+
+// configuration ===============================================================
+mongoose.connect(configDB.url); // connect to our database
+
+require('./config/passport')(passport); // pass passport for configuration
 try {
-  var config = require(__dirname + '/config.js');
+  var config = require(__dirname + '/config/config.js');
 } catch(e) {
   console.error("No config.js found! Copy and edit config.example.js to config.js!");
   process.exit(1);
@@ -28,6 +51,13 @@ try {
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
 var app = express();
+
+
+// Bootstrap models
+var modelsPath = path.join(__dirname, './models');
+fs.readdirSync(modelsPath).forEach(function (file) {
+  require(modelsPath + '/' + file);
+});
 
 app.set('showStackError', true);
 // cache=memory or swig dies in NODE_ENV=production
@@ -44,32 +74,87 @@ var port = process.env.PORT || 3105;
 
 // all environments
 app.set('port', port);
-app.set('view engine', 'html');
+app.set('view engine', 'ejs');
 app.set('views', __dirname + '/views');
 app.set('baseUrl', config.BASE_URL);
 app.set('runningWorkspaces', {});
 
-//Auth
 passport.use(new GithubStrategy({
-    clientID: config.GITHUB_CLIENT_ID,
-    clientSecret: config.GITHUB_CLIENT_SECRET,
-    callbackURL: app.get('baseUrl') + ':' + app.get('port') + '/auth/github/callback'
-  },
-  function(accessToken, refreshToken, profile, done) {
-    var username = path.basename(profile.username.toLowerCase());
-    if(!fs.existsSync(__dirname + '/workspaces/' + path.basename(username))) {
-      if(config.PERMITTED_USERS !== false && config.PERMITTED_USERS.indexOf(username)) return done('Sorry, not allowed :(', null);
+        clientID: config.GITHUB_CLIENT_ID,
+        clientSecret: config.GITHUB_CLIENT_SECRET,
+        callbackURL: app.get('baseUrl') + ':' + app.get('port') + '/auth/github/callback'
+    },
+    function(accessToken, refreshToken, profile, done) {
+        var username = path.basename(profile.username.toLowerCase());
+        if(!fs.existsSync(__dirname + '/workspaces/' + path.basename(username))) {
+            //if(config.PERMITTED_USERS !== false && config.PERMITTED_USERS.indexOf(username)) return done('Sorry, not allowed :(', null);
 
-      //Okay, that is slightly unintuitive: fs.mkdirSync returns "undefined", when successful..
-      if(fs.mkdirSync(__dirname + '/workspaces/' + path.basename(username), '0700') !== undefined) {
-        return done("Cannot create user", null);
-      } else {
+            //Okay, that is slightly unintuitive: fs.mkdirSync returns "undefined", when successful..
+            if(fs.mkdirSync(__dirname + '/workspaces/' + path.basename(username), '0700') !== undefined) {
+                return done("Cannot create user", null);
+            } else {
+                return done(null, username);
+            }
+        }
         return done(null, username);
-      }
     }
-    return done(null, username);
-  }
 ));
+
+passport.use('local-login', new LocalStrategy({
+        // by default, local strategy uses username and password, we will override with email
+        usernameField : 'email',
+        passwordField : 'password',
+        passReqToCallback : true // allows us to pass in the req from our route (lets us check if a user is logged in or not)
+    },
+    function(req, email, password, done) {
+        if (email)
+            email = email.toLowerCase(); // Use lower-case e-mails to avoid case-sensitive e-mail matching
+
+        // asynchronous
+        process.nextTick(function() {
+            var username = email;
+
+            var specialChars = "!@#$^&%*()+=-[]\/{}|:<>?,.";
+            for (var i = 0; i < specialChars.length; i++) {
+                username = username .replace(new RegExp("\\" + specialChars[i], 'gi'), '');
+            };
+            console.log("Username : " + username);
+
+            //var newTest = test.replace(/,/g, '-');
+
+            User.findOne({ 'local.email' :  email }, function(err, user) {
+                // if there are any errors, return the error
+                if (err)
+                    return done(err);
+
+                // if no user is found, return the message
+                if (!user)
+                    return done(null, false, req.flash('loginMessage', 'No user found.'));
+
+                if (!user.validPassword(password))
+                    return done(null, false, req.flash('loginMessage', 'Oops! Wrong password.'));
+
+                // all is well, return user
+                else {
+
+                    if(!fs.existsSync(__dirname + '/workspaces/' + path.basename(username))) {
+                        //if(config.PERMITTED_USERS !== false && config.PERMITTED_USERS.indexOf(username)) return done('Sorry, not allowed :(', null);
+
+                        //Okay, that is slightly unintuitive: fs.mkdirSync returns "undefined", when successful..
+                        if(fs.mkdirSync(__dirname + '/workspaces/' + path.basename(username), '0700') !== undefined) {
+                            return done("Cannot create user", null);
+                        } else {
+                            return done(null, username);
+                        }
+                    }
+                    return done(null, username);
+                }
+            });
+        });
+
+    }));
+
+
 
 //Middlewares
 app.use(express.favicon());
@@ -103,6 +188,12 @@ app.get('/auth/github/callback',
   function(req, res) {
     res.redirect('/#/dashboard');
   });
+
+app.post('/login', passport.authenticate('local-login', { failureRedirect: '/'}),
+    function(req, res) {
+        res.redirect('/#/dashboard');
+    }
+);
 
 app.get('/logout', function(req, res){
   req.logout();
@@ -142,6 +233,9 @@ if (config.SSL && config.SSL.key && config.SSL.cert) {
   server = http.createServer(app);
 }
 
+// routes ======================================================================
+//require('./routes/routes.js')(app, passport); // load our routes and pass in our app and fully configured passport
+
 server.listen(app.get('port'), function(){
   console.log('Express server listening on port ' + app.get('port'));
 });
@@ -149,9 +243,11 @@ server.listen(app.get('port'), function(){
 //Helpers
 
 passport.serializeUser(function(user, done) {
-  done(null, user);
+    done(null, user);
 });
 
+
 passport.deserializeUser(function(obj, done) {
-  done(null, obj);
+    done(null, obj);
 });
+
