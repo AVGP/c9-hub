@@ -13,4 +13,4 @@ exports.PERMITTED_USERS = false;
 //  cert: "/path/to/ssl.pem"
 //};
 
-exports.BASE_URL = 'http://localhost';
+exports.BASE_URL = 'https://localhost';

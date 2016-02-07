@@ -115,7 +115,7 @@ exports.destroy = function(req, res) {
         })
         .close()
       })
-      .listen(port)
+      .listen(port, '127.0.0.1')
     };
     
     var getNextAvailablePort = function(callback){
@@ -149,7 +149,7 @@ exports.destroy = function(req, res) {
             console.log("Starting " + __dirname + '/../c9/server.js for workspace ' + workspaceName + " on port " + nextFreePort);
             var workspaceDir = __dirname + '/../workspaces/' + req.user + '/' + workspaceName
             var out = fs.openSync(workspaceDir + '/.c9.log', 'a');
-            var workspace = fork(__dirname + '/../c9/server.js', ['-w', workspaceDir, '--listen', '0.0.0.0', '-p', nextFreePort, '-a', ':'], {detached: true, stdio: [out, out, out]});
+            var workspace = fork(__dirname + '/../c9/server.js', ['-w', workspaceDir, '--listen', '127.0.0.1', '-p', nextFreePort, '-a', ':'], {detached: true, stdio: [out, out, out]});
            
             req.app.get('runningWorkspaces')[req.user + '/' + workspaceName] = {
                 killTimeout: createWorkspaceKillTimeout(req, workspace, workspaceName),
